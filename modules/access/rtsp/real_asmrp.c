@@ -150,7 +150,8 @@ static void asmrp_string (asmrp_t *p) {
 
   while ( (p->ch!='"') && (p->ch>=32) ) {
 
-    p->str[l] = p->ch;
+    if (l < ASMRP_MAX_ID - 1)
+      p->str[l] = p->ch;
 
     l++;
     asmrp_getch (p);
@@ -172,7 +173,8 @@ static void asmrp_identifier (asmrp_t *p) {
   while ( ((p->ch>='A') && (p->ch<='z'))
       || ((p->ch>='0') && (p->ch<='9'))) {
 
-    p->str[l] = p->ch;
+    if (l < ASMRP_MAX_ID - 1)
+      p->str[l] = p->ch;
 
     l++;
     asmrp_getch (p);
