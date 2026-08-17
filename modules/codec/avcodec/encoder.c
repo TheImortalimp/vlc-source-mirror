@@ -1335,6 +1335,13 @@ static block_t *handle_delay_buffer( encoder_t *p_enc, encoder_sys_t *p_sys, uns
 
     if( likely( p_aout_buf ) )
     {
+        /* Validate that the leftover data fits within the allocated buffer to prevent heap overflow */
+        if( unlikely( buffer_delay + leftover > p_sys->i_buffer_out ) )
+        {
+            msg_Err( p_enc, "Buffer overflow prevented in delay buffer: leftover requires %zu bytes at offset %u but buffer is only %zu bytes",
+                     leftover, buffer_delay, p_sys->i_buffer_out );
+            return NULL;
+        }
 
         p_aout_buf->i_nb_samples -= leftover_samples;
         memcpy( p_sys->p_buffer+buffer_delay, p_aout_buf->p_buffer, leftover );
@@ -1465,6 +1472,14 @@ static block_t *EncodeAudio( encoder_t *p_enc, block_t *p_aout_buf )
         const int in_bytes = p_sys->frame->nb_samples *
             p_enc->fmt_out.audio.i_channels* p_sys->i_sample_bytes;
 
+        /* Validate that the computed size fits within the allocated buffer to prevent heap overflow */
+        if( unlikely( (size_t)in_bytes > p_sys->i_buffer_out ) )
+        {
+            msg_Err( p_enc, "Buffer overflow prevented: frame requires %d bytes but buffer is only %zu bytes",
+                     in_bytes, p_sys->i_buffer_out );
+            break;
+        }
+
         if( p_sys->b_planar )
         {
             aout_Deinterleave( p_sys->p_buffer, p_aout_buf->p_buffer,
@@ -1501,9 +1516,18 @@ static block_t *EncodeAudio( encoder_t *p_enc, block_t *p_aout_buf )
     // that frame has more data than p_sys->i_frame_size most of the cases currently.
     if( p_aout_buf->i_nb_samples > 0 )
     {
-       memcpy( p_sys->p_buffer + buffer_delay, p_aout_buf->p_buffer,
-               p_aout_buf->i_nb_samples * p_sys->i_sample_bytes * p_enc->fmt_out.audio.i_channels);
-       p_sys->i_samples_delay += p_aout_buf->i_nb_samples;
+       size_t leftover_bytes = p_aout_buf->i_nb_samples * p_sys->i_sample_bytes * p_enc->fmt_out.audio.i_channels;
+       /* Validate that the leftover data fits within the allocated buffer to prevent heap overflow */
+       if( unlikely( buffer_delay + leftover_bytes > p_sys->i_buffer_out ) )
+       {
+           msg_Err( p_enc, "Buffer overflow prevented: leftover requires %zu bytes at offset %zu but buffer is only %zu bytes",
+                    leftover_bytes, buffer_delay, p_sys->i_buffer_out );
+       }
+       else
+       {
+           memcpy( p_sys->p_buffer + buffer_delay, p_aout_buf->p_buffer, leftover_bytes);
+           p_sys->i_samples_delay += p_aout_buf->i_nb_samples;
+       }
     }
 
     return p_chain;
