@@ -545,6 +545,13 @@ static void stereo2mono_downmix( filter_t * p_filter,
         d_amplitude_factor
             = p_sys->p_atomic_operations[i].d_amplitude_factor;
 
+        /* Validate destination channel offset to prevent out-of-bounds write.
+         * In downmix mode, output is mono (i_output_nb=1) but atomic operations
+         * may have been computed for stereo destinations (i_dest_channel_offset=1).
+         */
+        if( i_dest_channel_offset >= i_output_nb )
+            continue;
+
         if( p_out_buf->i_nb_samples > i_delay )
         {
             /* current buffer coefficients */
