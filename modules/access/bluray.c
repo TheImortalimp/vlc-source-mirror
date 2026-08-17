@@ -1814,13 +1814,45 @@ static void blurayDrawOverlay(demux_t *p_demux, const BD_OVERLAY* const eventov)
 
     /* Now we can update the region, regardless it's an update or an insert */
     const BD_PG_RLE_ELEM *img = eventov->img;
-    for (int y = 0; y < eventov->h; y++)
+    plane_t *p = &p_reg->p_picture->p[0];
+    
+    for (int y = 0; y < eventov->h; y++) {
         for (int x = 0; x < eventov->w;) {
-            plane_t *p = &p_reg->p_picture->p[0];
-            memset(&p->p_pixels[y * p->i_pitch + x], img->color, img->len);
+            /* Validate that img->len is non-zero and fits within the remaining width */
+            if (img->len == 0) {
+                msg_Err(p_demux, "Invalid RLE element: zero-length run at row %d, column %d", y, x);
+                vlc_mutex_unlock(&ov->lock);
+                return;
+            }
+            
+            if (img->len > (unsigned int)(eventov->w - x)) {
+                msg_Err(p_demux, "Invalid RLE element: run length %u exceeds remaining width %d at row %d, column %d",
+                        img->len, eventov->w - x, y, x);
+                vlc_mutex_unlock(&ov->lock);
+                return;
+            }
+            
+            /* Validate that the write stays within the allocated buffer */
+            size_t offset = y * p->i_pitch + x;
+            size_t buffer_size = p->i_pitch * p->i_lines;
+            if (offset + img->len > buffer_size) {
+                msg_Err(p_demux, "Invalid RLE element: write would exceed buffer bounds at row %d, column %d", y, x);
+                vlc_mutex_unlock(&ov->lock);
+                return;
+            }
+            
+            memset(&p->p_pixels[offset], img->color, img->len);
             x += img->len;
             img++;
         }
+        
+        /* Verify that the RLE stream exactly partitioned this row */
+        if (x != eventov->w) {
+            msg_Err(p_demux, "Invalid RLE stream: row %d ended at column %d instead of %d", y, x, eventov->w);
+            vlc_mutex_unlock(&ov->lock);
+            return;
+        }
+    }
 
     if (eventov->palette) {
         p_reg->fmt.p_palette->i_entries = 256;
