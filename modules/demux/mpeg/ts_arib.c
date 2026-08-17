@@ -118,6 +118,10 @@ static const unsigned int CLUT_to_chunks_len = sizeof(CLUT_to_chunks);
 
 bool ts_arib_inject_png_palette( const uint8_t *p_in, size_t i_in, uint8_t **pp_out, size_t *pi_out )
 {
+    /* Minimum PNG structure: 8-byte signature + 8-byte header = 16 bytes minimum */
+    if( i_in < 16 )
+        return false;
+
     const uint8_t *p_data = p_in;
     const uint8_t *p_idat = NULL;
     size_t i_data = i_in - 8;
@@ -145,12 +149,16 @@ bool ts_arib_inject_png_palette( const uint8_t *p_in, size_t i_in, uint8_t **pp_
         return false;
 
     {
+        const size_t i_head = p_data - p_in;
+        /* Ensure we haven't advanced beyond the input buffer */
+        if( i_head > i_in )
+            return false;
+
         uint8_t *p_out = *pp_out = malloc( i_in + CLUT_to_chunks_len );
         if( !p_out )
             return false;
         *pi_out = i_in + CLUT_to_chunks_len;
 
-        const size_t i_head = p_data - p_in;
         memcpy( p_out, p_in, i_head );
         memcpy( &p_out[i_head], CLUT_to_chunks, CLUT_to_chunks_len );
         memcpy( &p_out[i_head + CLUT_to_chunks_len], p_data, i_in - i_head );
