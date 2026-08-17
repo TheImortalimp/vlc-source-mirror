@@ -545,6 +545,12 @@ static int ProcessALACCookie( demux_t *p_demux, const uint8_t *p, uint64_t i_siz
     }
     else
     {
+        /* Validate size fits in int to prevent truncation in cast */
+        if( i_size > INT_MAX )
+        {
+            msg_Err( p_demux, "ALAC magic cookie size too large (%"PRIu64" > %d)", i_size, INT_MAX );
+            return VLC_EGENERIC;
+        }
         msg_Warn( p_demux, "Unknown alac magic cookie. Passing it on to the decoder as is and hoping for the best." );
         i_extra = ( int )i_size;
     }
@@ -678,6 +684,13 @@ aac_kuki_finish:
         i_offset = 0;
     }
 
+    /* Validate size fits in int to prevent truncation in cast */
+    if( i_kuki_size > INT_MAX )
+    {
+        msg_Err( p_demux, "AAC magic cookie size too large (%"PRIu64" > %d)", i_kuki_size, INT_MAX );
+        return VLC_EGENERIC;
+    }
+
     p_sys->fmt.i_extra = (int)i_kuki_size;
     p_sys->fmt.p_extra = malloc( i_kuki_size );
 
@@ -720,6 +733,13 @@ static int ReadKukiChunk( demux_t *p_demux, uint64_t i_size )
     }
     else if( p_sys->fmt.i_codec != 0 )
     {
+        /* Validate size fits in int to prevent truncation in cast */
+        if( i_size > INT_MAX )
+        {
+            msg_Err( p_demux, "Magic cookie size too large (%"PRIu64" > %d)", i_size, INT_MAX );
+            return VLC_EGENERIC;
+        }
+
         p_sys->fmt.i_extra = (int)i_size;
         p_sys->fmt.p_extra = malloc( i_size );
 
