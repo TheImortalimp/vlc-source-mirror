@@ -708,9 +708,17 @@ static void CreateKateBitmap( picture_t *pic, const kate_bitmap *bitmap )
 static void CreateKatePalette( video_palette_t *fmt_palette, const kate_palette *palette )
 {
     size_t n;
+    size_t ncolors;
 
-    fmt_palette->i_entries = palette->ncolors;
-    for( n=0; n<palette->ncolors; ++n )
+    /* Clamp palette size to prevent out-of-bounds write */
+    ncolors = palette->ncolors;
+    if( ncolors > VIDEO_PALETTE_COLORS_MAX )
+    {
+        ncolors = VIDEO_PALETTE_COLORS_MAX;
+    }
+
+    fmt_palette->i_entries = ncolors;
+    for( n=0; n<ncolors; ++n )
     {
         rgb_to_yuv(
             &fmt_palette->palette[n][0], &fmt_palette->palette[n][1], &fmt_palette->palette[n][2],
